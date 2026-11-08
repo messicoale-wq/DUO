@@ -23,17 +23,21 @@ HDRS = {
     "Sec-Fetch-Site": "same-origin",
 }
 
-S = requests.Session(impersonate="chrome")
+S = None
+N = 0
 last = {}
 
 
-def warm():
-    try:
-        S.get("https://www.apple.com/it/shop/buy-iphone/iphone-duo", timeout=25)
-        S.get("https://www.apple.com/it/", timeout=25)
-        print("sessione calda, cookie:", len(S.cookies))
-    except Exception as e:
-        print("warm err", e)
+def fresh(caldo=False):
+    global S, N
+    S = requests.Session(impersonate="chrome")
+    N = 0
+    if caldo:
+        try:
+            S.get("https://www.apple.com/it/shop/buy-iphone/iphone-duo", timeout=25)
+            print("sessione nuova con cookie")
+        except Exception as e:
+            print("warm err", e)
 
 
 def push(titolo, testo):
@@ -55,18 +59,25 @@ def push(titolo, testo):
 
 
 def chiama(url):
-    for ep in ("retail/pickup-message", "fulfillment-messages"):
-        u = url.replace("retail/pickup-message", ep)
+    global N
+    for tentativo in range(3):
+        if N >= 10:
+            fresh()
+        u = url if tentativo == 0 else url.replace("retail/pickup-message", "fulfillment-messages")
         try:
             r = S.get(u, headers=HDRS, timeout=20)
-            print(ep, r.status_code)
+            N += 1
+            print(u.split("/")[-2], r.status_code, "req", N)
             if r.status_code == 200:
                 try:
                     return r.json()
                 except Exception:
                     pass
+            else:
+                fresh()
         except Exception as e:
-            print(ep, "err", e)
+            print("err", e)
+            fresh()
     return None
 
 
@@ -101,7 +112,7 @@ def giro():
 
 if __name__ == "__main__":
     print("avvio", datetime.now())
-    warm()
+    fresh(caldo=True)
     for n in range(28):
         giro()
         if n < 27:
