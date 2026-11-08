@@ -5,6 +5,7 @@ from curl_cffi import requests
 TARGETS = [
     {"cap": "10095", "want": "grugliasco", "nome": "Le Gru"},
     {"cap": "20089", "want": "rozzano", "nome": "Fiordaliso"},
+    {"cap": "10121", "want": "via roma", "nome": "Via Roma"},
 ]
 PARTS = ["MK2D4QN/A", "MK2F4QN/A"]
 TOPIC = os.environ["NTFY_TOPIC"]
@@ -43,6 +44,15 @@ def fresh(caldo=False):
 def push(titolo, testo):
     try:
         requests.post(
+            f"https://api.telegram.org/bot{os.environ['TG_TOKEN']}/sendMessage",
+            json={"chat_id": os.environ["TG_CHAT"], "text": titolo + " — " + testo},
+            timeout=15,
+        )
+        print("tg ok")
+    except Exception as e:
+        print("tg err", e)
+    try:
+        requests.post(
             f"https://ntfy.sh/{TOPIC}",
             data=testo.encode(),
             headers={
@@ -53,9 +63,9 @@ def push(titolo, testo):
             },
             timeout=15,
         )
-        print("inviato:", titolo, testo)
+        print("ntfy ok")
     except Exception as e:
-        print("push err", e)
+        print("ntfy err", e)
 
 
 def chiama(url):
@@ -117,7 +127,7 @@ if __name__ == "__main__":
     print("avvio", datetime.now())
     fresh(caldo=True)
     ko = 0
-    for n in range(18):
+    for n in range(12):
         if giro() == 0:
             ko += 1
             if ko >= 4:
@@ -125,7 +135,7 @@ if __name__ == "__main__":
                 break
         else:
             ko = 0
-        if n < 17:
+        if n < 11:
             time.sleep(10)
     try:
         requests.get(PING, timeout=15)
