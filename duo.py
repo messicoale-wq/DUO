@@ -68,7 +68,7 @@ def push(titolo, testo):
         print("ntfy err", e)
 
 
-def chiama(url):
+def chiama(url, nome):
     global N
     for tentativo in range(2):
         if N >= 10:
@@ -77,7 +77,7 @@ def chiama(url):
         try:
             r = S.get(u, headers=HDRS, timeout=20)
             N += 1
-            print(u.split("/")[-2], r.status_code, "req", N)
+            print(nome, r.status_code, "req", N)
             if r.status_code == 200:
                 try:
                     return r.json()
@@ -86,7 +86,7 @@ def chiama(url):
             else:
                 fresh()
         except Exception as e:
-            print("err", e)
+            print(nome, "err", e)
             fresh()
     return None
 
@@ -101,7 +101,7 @@ def giro():
         for i, p in enumerate(PARTS):
             url += f"&parts.{i}={p}"
 
-        data = chiama(url)
+        data = chiama(url, t["nome"])
         if not data:
             continue
         ok += 1
