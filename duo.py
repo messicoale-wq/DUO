@@ -9,13 +9,31 @@ TARGETS = [
 PARTS = ["MK2D4QN/A", "MK2F4QN/A"]
 TOPIC = os.environ["NTFY_TOPIC"]
 PING = "https://hc-ping.com/d9ba624b-eaf3-4cea-b4d0-13d99bab793b"
+
 HDRS = {
     "Accept": "application/json, text/javascript, */*; q=0.01",
     "Accept-Language": "it-IT,it;q=0.9,en;q=0.8",
     "Referer": "https://www.apple.com/it/shop/buy-iphone/iphone-duo",
     "X-Requested-With": "XMLHttpRequest",
+    "sec-ch-ua": '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": '"macOS"',
+    "Sec-Fetch-Dest": "empty",
+    "Sec-Fetch-Mode": "cors",
+    "Sec-Fetch-Site": "same-origin",
 }
+
+S = requests.Session(impersonate="chrome")
 last = {}
+
+
+def warm():
+    try:
+        S.get("https://www.apple.com/it/shop/buy-iphone/iphone-duo", timeout=25)
+        S.get("https://www.apple.com/it/", timeout=25)
+        print("sessione calda, cookie:", len(S.cookies))
+    except Exception as e:
+        print("warm err", e)
 
 
 def push(titolo, testo):
@@ -36,6 +54,22 @@ def push(titolo, testo):
         print("push err", e)
 
 
+def chiama(url):
+    for ep in ("retail/pickup-message", "fulfillment-messages"):
+        u = url.replace("retail/pickup-message", ep)
+        try:
+            r = S.get(u, headers=HDRS, timeout=20)
+            print(ep, r.status_code)
+            if r.status_code == 200:
+                try:
+                    return r.json()
+                except Exception:
+                    pass
+        except Exception as e:
+            print(ep, "err", e)
+    return None
+
+
 def giro():
     for t in TARGETS:
         url = (
@@ -45,14 +79,8 @@ def giro():
         for i, p in enumerate(PARTS):
             url += f"&parts.{i}={p}"
 
-        try:
-            r = requests.get(url, headers=HDRS, impersonate="chrome", timeout=20)
-            if r.status_code != 200:
-                print(t["nome"], "status", r.status_code)
-                continue
-            data = r.json()
-        except Exception as e:
-            print(t["nome"], "err", e)
+        data = chiama(url)
+        if not data:
             continue
 
         for s in data.get("body", {}).get("stores", []):
@@ -73,9 +101,10 @@ def giro():
 
 if __name__ == "__main__":
     print("avvio", datetime.now())
-    for n in range(30):
+    warm()
+    for n in range(28):
         giro()
-        if n < 29:
+        if n < 27:
             time.sleep(10)
     try:
         requests.get(PING, timeout=15)
