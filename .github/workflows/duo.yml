@@ -16,3 +16,5 @@ jobs:
     - run: python duo.py
       env:
         NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+        TG_TOKEN: ${{ secrets.TG_TOKEN }}
+        TG_CHAT: ${{ secrets.TG_CHAT }}
