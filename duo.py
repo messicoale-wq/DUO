@@ -60,7 +60,7 @@ def push(titolo, testo):
 
 def chiama(url):
     global N
-    for tentativo in range(3):
+    for tentativo in range(2):
         if N >= 10:
             fresh()
         u = url if tentativo == 0 else url.replace("retail/pickup-message", "fulfillment-messages")
@@ -82,6 +82,7 @@ def chiama(url):
 
 
 def giro():
+    ok = 0
     for t in TARGETS:
         url = (
             "https://www.apple.com/it/shop/retail/pickup-message"
@@ -93,6 +94,7 @@ def giro():
         data = chiama(url)
         if not data:
             continue
+        ok += 1
 
         for s in data.get("body", {}).get("stores", []):
             nome = (s.get("storeName") or "").lower()
@@ -108,14 +110,22 @@ def giro():
                 last[k] = now
                 gb = "256" if p == "MK2D4QN/A" else "512"
                 push(f"DUO {gb} BIANCO", t["nome"])
+    return ok
 
 
 if __name__ == "__main__":
     print("avvio", datetime.now())
     fresh(caldo=True)
-    for n in range(28):
-        giro()
-        if n < 27:
+    ko = 0
+    for n in range(18):
+        if giro() == 0:
+            ko += 1
+            if ko >= 4:
+                print("bloccato, esco")
+                break
+        else:
+            ko = 0
+        if n < 17:
             time.sleep(10)
     try:
         requests.get(PING, timeout=15)
