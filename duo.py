@@ -11,10 +11,21 @@ PARTS = ["MK2D4QN/A", "MK2F4QN/A"]
 TOPIC = os.environ["NTFY_TOPIC"]
 PING = "https://hc-ping.com/d9ba624b-eaf3-4cea-b4d0-13d99bab793b"
 
-WUSERS = [u.strip() for u in os.environ.get("WEBSHARE_USER", "").split(",") if u.strip()]
-WPASS = os.environ.get("WEBSHARE_PASS", "").strip()
-WHOST = os.environ.get("WEBSHARE_HOST", "p.webshare.io:80").strip()
-PROXIES = [f"http://{u}:{WPASS}@{WHOST}" for u in WUSERS] if WUSERS and WPASS else []
+WPASS = "3e1m9fvhgohd"
+WHOST = "p.webshare.io:80"
+WUSERS = [
+    "ibkewoalresidential-it-1",
+    "ibkewoalresidential-it-2",
+    "ibkewoalresidential-it-3",
+    "ibkewoalresidential-it-4",
+    "ibkewoalresidential-it-5",
+    "ibkewoalresidential-it-6",
+    "ibkewoalresidential-it-7",
+    "ibkewoalresidential-it-8",
+    "ibkewoalresidential-it-9",
+    "ibkewoalresidential-it-10",
+]
+PROXIES = [f"http://{u}:{WPASS}@{WHOST}" for u in WUSERS]
 
 HDRS = {
     "Accept": "application/json, text/javascript, */*; q=0.01",
@@ -152,9 +163,12 @@ def giro():
         data = chiama(url, t["nome"])
         if not data:
             continue
+        stores = data.get("body", {}).get("stores") or []
+        if not stores:
+            continue
         ok += 1
 
-        for s in data.get("body", {}).get("stores", []):
+        for s in stores:
             nome = (s.get("storeName") or "").lower()
             if t["want"] not in nome:
                 continue
