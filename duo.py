@@ -8,10 +8,10 @@ TG_CHAT = os.environ.get("TG_CHAT", "")
 HC = "https://hc-ping.com/d9ba624b-eaf3-4cea-b4d0-13d99bab793b"
 BAG = "https://www.apple.com/it/shop/bag"
 
-WUSER = ["ibkewoalresidential-it-%d" % i for i in range(1, 11)]
 WPASS = "DuoProxy2026"
 PHOST = "p.webshare.io:80"
-PROXIES = ["http://%s:%s@%s" % (u, WPASS, PHOST) for u in WUSER]
+PROXIES = ["http://ibkewoalresidential-IT-%d:%s@%s" % (i, WPASS, PHOST)
+           for i in range(1, 4367)]
 coda = []
 
 CODES = [("256", "MK2D4QL/A"), ("512", "MK2F4QL/A")]
@@ -37,8 +37,7 @@ gia = set()
 def prossimo():
     global coda
     if not coda:
-        coda = PROXIES[:]
-        random.shuffle(coda)
+        coda = random.sample(PROXIES, len(PROXIES))
     return coda.pop()
 
 
