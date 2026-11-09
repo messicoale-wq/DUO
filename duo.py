@@ -47,6 +47,8 @@ proxy_on = bool(PROXIES)
 proxy_ko = 0
 last = {}
 diag = []
+tent = 0
+err = 0
 
 
 def nuova(con_proxy):
@@ -94,7 +96,7 @@ def push(titolo, testo):
 
 
 def prova(url, nome, sessione, modo):
-    global N
+    global N, tent, err
     if sessione is None:
         return None
     if N >= 10:
@@ -106,6 +108,7 @@ def prova(url, nome, sessione, modo):
     if modo == "proxy":
         if not PROXIES:
             return None
+        tent += 1
         p = random.choice(PROXIES)
         kw["proxies"] = {"http": p, "https": p}
     try:
@@ -122,6 +125,8 @@ def prova(url, nome, sessione, modo):
                 return None
         return None
     except Exception as e:
+        if modo == "proxy":
+            err += 1
         print(nome, modo, "err", str(e)[:80])
         return None
 
@@ -215,7 +220,8 @@ if __name__ == "__main__":
     pieni = sum(1 for x in diag if x >= 500)
     vuoti = sum(1 for x in diag if x < 500)
     riassunto = (
-        f"n={len(diag)} pieni={pieni} vuoti={vuoti} "
+        f"tent={tent} ok={len(diag)} err={err} "
+        f"pieni={pieni} vuoti={vuoti} "
         f"min={min(diag) if diag else 0} max={max(diag) if diag else 0}"
     )
     print(riassunto)
