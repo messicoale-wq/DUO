@@ -97,58 +97,73 @@ def trovato(nome, size, code):
     print("TROVATO", m.replace("\n", " "), flush=True)
 
 
+def chiedi(url):
+    st, txt, em = 0, "", ""
+    for k in range(2):
+        p = None if diretto else random.choice(PROXIES)
+        try:
+            kw = {"timeout": 25, "impersonate": "chrome"}
+            if p:
+                kw["proxies"] = {"http": p, "https": p}
+            r = S.get(url, **kw)
+            st = r.status_code
+            txt = r.text or ""
+            if st == 200 and '"stores"' in txt:
+                return st, txt, ""
+        except Exception as e:
+            st, txt = 0, ""
+            em = "%s %s" % (type(e).__name__, str(e)[:110])
+        if k == 0:
+            time.sleep(0.4 + random.random() * 0.5)
+    return st, txt, em
+
+
 def giro():
     global tent, ok, err, pieni, vuoti, mn, mx, ult, corpo, di_fila, diretto
     for nome, cap in STORES:
         url = ("https://www.apple.com/it/shop/retail/pickup-message"
                "?parts.0=%s&parts.1=%s&location=%s&little=false&mt=regular"
                % (CODES[0][1], CODES[1][1], cap))
-        p = None if diretto else random.choice(PROXIES)
         tent += 1
-        try:
-            kw = {"timeout": 25, "impersonate": "chrome"}
-            if p:
-                kw["proxies"] = {"http": p, "https": p}
-            r = S.get(url, **kw)
-            txt = r.text or ""
-            n = len(txt)
+        st, txt, em = chiedi(url)
+        n = len(txt)
+        if n:
             if n < mn:
                 mn = n
             if n > mx:
                 mx = n
-            if corpo == "-" and txt:
-                corpo = txt[:170].replace("\n", " ")
-            if r.status_code == 200 and '"stores"' in txt:
-                pieni += 1
-                ok += 1
-                di_fila = 0
-                j = json.loads(txt)
-                stores = (j.get("body") or {}).get("stores") or []
-                if isinstance(stores, dict):
-                    stores = list(stores.values())
-                for sv in stores:
-                    sn = sv.get("storeName") or ""
-                    if not match(nome, sn):
-                        continue
-                    pa = sv.get("partsAvailability") or {}
-                    for size, code in CODES:
-                        x = pa.get(code) or {}
-                        if (x.get("pickupDisplay") or "").lower() == "available":
-                            trovato(nome, size, code)
-            elif r.status_code == 200:
-                vuoti += 1
-                ult = "vuoto"
-            else:
-                vuoti += 1
-                ult = str(r.status_code)
-                if p:
-                    di_fila += 1
-        except Exception as e:
+        if corpo == "-" and txt:
+            corpo = txt[:170].replace("\n", " ")
+        if st == 200 and '"stores"' in txt:
+            ok += 1
+            pieni += 1
+            di_fila = 0
+            j = json.loads(txt)
+            stores = (j.get("body") or {}).get("stores") or []
+            if isinstance(stores, dict):
+                stores = list(stores.values())
+            for sv in stores:
+                sn = sv.get("storeName") or ""
+                if not match(nome, sn):
+                    continue
+                pa = sv.get("partsAvailability") or {}
+                for size, code in CODES:
+                    x = pa.get(code) or {}
+                    if (x.get("pickupDisplay") or "").lower() == "available":
+                        trovato(nome, size, code)
+        elif st == 0:
             err += 1
-            ult = "%s %s" % (type(e).__name__, str(e)[:110])
-            if p:
-                di_fila += 1
-        if p and di_fila >= 4:
+            ult = em or "errore"
+            di_fila += 1
+        elif st != 200:
+            vuoti += 1
+            ult = str(st)
+            di_fila += 1
+        else:
+            vuoti += 1
+            ult = "vuoto"
+            di_fila += 1
+        if di_fila >= 6:
             diretto = True
         print(nome, tent, ok, err, pieni, vuoti, ult, flush=True)
 
