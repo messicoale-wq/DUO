@@ -127,7 +127,7 @@ if __name__ == "__main__":
     print("avvio", datetime.now())
     fresh(caldo=True)
     ko = 0
-    for n in range(12):
+    for n in range(6):
         if giro() == 0:
             ko += 1
             if ko >= 4:
@@ -135,8 +135,8 @@ if __name__ == "__main__":
                 break
         else:
             ko = 0
-        if n < 11:
-            time.sleep(10)
+        if n < 5:
+            time.sleep(8)
     try:
         requests.get(PING, timeout=15)
     except Exception:
