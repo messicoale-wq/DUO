@@ -27,6 +27,7 @@ mx = 0
 ult = "-"
 pt1 = "-"
 pt2 = "-"
+corpo = "-"
 di_fila = 0
 diretto = False
 gia = set()
@@ -97,7 +98,7 @@ def trovato(nome, size, code):
 
 
 def giro():
-    global tent, ok, err, pieni, vuoti, mn, mx, ult, di_fila, diretto
+    global tent, ok, err, pieni, vuoti, mn, mx, ult, corpo, di_fila, diretto
     for nome, cap in STORES:
         url = ("https://www.apple.com/it/shop/retail/pickup-message"
                "?parts.0=%s&parts.1=%s&location=%s"
@@ -115,6 +116,8 @@ def giro():
                 mn = n
             if n > mx:
                 mx = n
+            if corpo == "-" and txt:
+                corpo = txt[:170].replace("\n", " ")
             if r.status_code == 200 and '"stores"' in txt:
                 pieni += 1
                 ok += 1
@@ -149,9 +152,9 @@ def giro():
 
 
 def manda_diag():
-    m = ("DIAG tent=%d ok=%d err=%d pieni=%d vuoti=%d min=%d max=%d dir=%d pt1=[%s] pt2=[%s] ult=[%s]"
+    m = ("DIAG tent=%d ok=%d err=%d pieni=%d vuoti=%d min=%d max=%d dir=%d pt1=[%s] pt2=[%s] ult=[%s] corpo=[%s]"
          % (tent, ok, err, pieni, vuoti, mn if mn < 999999 else 0, mx,
-            1 if diretto else 0, pt1, pt2, ult))
+            1 if diretto else 0, pt1, pt2, ult, corpo))
     ntfy(m, 2)
     print(m, flush=True)
 
