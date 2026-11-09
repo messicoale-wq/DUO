@@ -12,6 +12,7 @@ WUSER = ["ibkewoalresidential-it-%d" % i for i in range(1, 11)]
 WPASS = "DuoProxy2026"
 PHOST = "p.webshare.io:80"
 PROXIES = ["http://%s:%s@%s" % (u, WPASS, PHOST) for u in WUSER]
+coda = []
 
 CODES = [("256", "MK2D4QL/A"), ("512", "MK2F4QL/A")]
 STORES = [("Le Gru", "10095"), ("Fiordaliso", "20089"), ("Via Roma", "10121")]
@@ -31,6 +32,14 @@ corpo = "-"
 di_fila = 0
 diretto = False
 gia = set()
+
+
+def prossimo():
+    global coda
+    if not coda:
+        coda = PROXIES[:]
+        random.shuffle(coda)
+    return coda.pop()
 
 
 def ntfy(msg, prio=3):
@@ -71,7 +80,7 @@ def probe(url, p):
 
 
 def prova_proxy():
-    p = random.choice(PROXIES)
+    p = prossimo()
     print("PROXY", p.replace(WPASS, "***"), flush=True)
     a = probe("http://api.ipify.org?format=json", p)
     print("PT1", a, flush=True)
@@ -99,8 +108,8 @@ def trovato(nome, size, code):
 
 def chiedi(url):
     st, txt, em = 0, "", ""
-    for k in range(2):
-        p = None if diretto else random.choice(PROXIES)
+    for k in range(3):
+        p = None if diretto else prossimo()
         try:
             kw = {"timeout": 25, "impersonate": "chrome"}
             if p:
@@ -113,8 +122,8 @@ def chiedi(url):
         except Exception as e:
             st, txt = 0, ""
             em = "%s %s" % (type(e).__name__, str(e)[:110])
-        if k == 0:
-            time.sleep(0.4 + random.random() * 0.5)
+        if k < 2:
+            time.sleep(0.2 + random.random() * 0.3)
     return st, txt, em
 
 
@@ -130,72 +139,4 @@ def giro():
         if n:
             if n < mn:
                 mn = n
-            if n > mx:
-                mx = n
-        if corpo == "-" and txt:
-            corpo = txt[:170].replace("\n", " ")
-        if st == 200 and '"stores"' in txt:
-            ok += 1
-            pieni += 1
-            di_fila = 0
-            j = json.loads(txt)
-            stores = (j.get("body") or {}).get("stores") or []
-            if isinstance(stores, dict):
-                stores = list(stores.values())
-            for sv in stores:
-                sn = sv.get("storeName") or ""
-                if not match(nome, sn):
-                    continue
-                pa = sv.get("partsAvailability") or {}
-                for size, code in CODES:
-                    x = pa.get(code) or {}
-                    if (x.get("pickupDisplay") or "").lower() == "available":
-                        trovato(nome, size, code)
-        elif st == 0:
-            err += 1
-            ult = em or "errore"
-            di_fila += 1
-        elif st != 200:
-            vuoti += 1
-            ult = str(st)
-            di_fila += 1
-        else:
-            vuoti += 1
-            ult = "vuoto"
-            di_fila += 1
-        if di_fila >= 6:
-            diretto = True
-        print(nome, tent, ok, err, pieni, vuoti, ult, flush=True)
-
-
-def manda_diag():
-    m = ("DIAG tent=%d ok=%d err=%d pieni=%d vuoti=%d min=%d max=%d dir=%d pt1=[%s] pt2=[%s] ult=[%s] corpo=[%s]"
-         % (tent, ok, err, pieni, vuoti, mn if mn < 999999 else 0, mx,
-            1 if diretto else 0, pt1, pt2, ult, corpo))
-    print(m, flush=True)
-    if ok == 0:
-        ntfy("DUO cieco: " + m, 4)
-
-
-def main():
-    global pt1, pt2
-    hc("/start")
-    pt1, pt2 = prova_proxy()
-    for i in range(6):
-        giro()
-        if i < 5:
-            time.sleep(1.0 + random.random() * 0.8)
-    manda_diag()
-    hc()
-
-
-if __name__ == "__main__":
-    try:
-        main()
-    except Exception as e:
-        try:
-            hc("/fail")
-            ntfy("DUO script morto: %s %s" % (type(e).__name__, str(e)[:80]), 4)
-        except Exception:
-            pass
-        sys.exit(1)
+            if n
