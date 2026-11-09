@@ -92,8 +92,8 @@ def trovato(nome, size, code):
         return
     gia.add(k)
     m = "DUO %s BIANCO %s\n%s\n%s" % (size, nome, code, BAG)
-    ntfy(m, 5)
     tg(m)
+    ntfy(m, 5)
     print("TROVATO", m.replace("\n", " "), flush=True)
 
 
@@ -173,8 +173,8 @@ def manda_diag():
          % (tent, ok, err, pieni, vuoti, mn if mn < 999999 else 0, mx,
             1 if diretto else 0, pt1, pt2, ult, corpo))
     print(m, flush=True)
-    if err or vuoti or ok < tent or (int(time.time()) % 1800) < 60:
-        ntfy(m, 2)
+    if ok == 0:
+        ntfy("DUO cieco: " + m, 4)
 
 
 def main():
