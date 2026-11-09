@@ -190,9 +190,9 @@ def main():
     global pt1, pt2
     hc("/start")
     pt1, pt2 = prova_proxy()
-    for i in range(3):
+    for i in range(2):
         giro()
-        if i < 2:
+        if i < 1:
             time.sleep(0.5 + random.random() * 0.4)
     manda_diag()
     hc()
