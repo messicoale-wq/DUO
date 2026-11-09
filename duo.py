@@ -157,8 +157,9 @@ def manda_diag():
     m = ("DIAG tent=%d ok=%d err=%d pieni=%d vuoti=%d min=%d max=%d dir=%d pt1=[%s] pt2=[%s] ult=[%s] corpo=[%s]"
          % (tent, ok, err, pieni, vuoti, mn if mn < 999999 else 0, mx,
             1 if diretto else 0, pt1, pt2, ult, corpo))
-    ntfy(m, 2)
     print(m, flush=True)
+    if err or vuoti or ok < tent or (int(time.time()) % 1800) < 60:
+        ntfy(m, 2)
 
 
 def main():
