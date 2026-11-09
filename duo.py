@@ -73,7 +73,7 @@ def hc(path=""):
 def probe(url, p):
     try:
         r = creq.get(url, proxies={"http": p, "https": p},
-                     impersonate="chrome", timeout=25)
+                     impersonate="chrome", timeout=15)
         return "%s %s" % (r.status_code, (r.text or "")[:50])
     except Exception as e:
         return "ERR %s %s" % (type(e).__name__, str(e)[:110])
@@ -111,7 +111,7 @@ def chiedi(url):
     for k in range(3):
         p = None if diretto else prossimo()
         try:
-            kw = {"timeout": 25, "impersonate": "chrome"}
+            kw = {"timeout": 15, "impersonate": "chrome"}
             if p:
                 kw["proxies"] = {"http": p, "https": p}
             r = S.get(url, **kw)
@@ -190,10 +190,10 @@ def main():
     global pt1, pt2
     hc("/start")
     pt1, pt2 = prova_proxy()
-    for i in range(4):
+    for i in range(3):
         giro()
-        if i < 3:
-            time.sleep(1.0 + random.random() * 0.8)
+        if i < 2:
+            time.sleep(0.5 + random.random() * 0.4)
     manda_diag()
     hc()
 
