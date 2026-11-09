@@ -35,6 +35,7 @@ N = 0
 proxy_on = bool(PROXIES)
 proxy_ko = 0
 last = {}
+diag = []
 
 
 def nuova(con_proxy):
@@ -99,7 +100,10 @@ def prova(url, nome, sessione, modo):
     try:
         r = sessione.get(url, headers=HDRS, timeout=25, **kw)
         N += 1
-        print(nome, modo, r.status_code, "req", N)
+        lung = len(r.text)
+        print(nome, modo, r.status_code, lung, "req", N)
+        if modo == "proxy":
+            diag.append(lung)
         if r.status_code == 200:
             try:
                 return r.json()
@@ -167,6 +171,19 @@ def giro():
     return ok
 
 
+def manda_diag(riassunto):
+    h = {"Title": "DIAG", "Priority": "3"}
+    for _ in range(2):
+        try:
+            r = requests.post(f"https://ntfy.sh/{TOPIC}", data=riassunto.encode(), headers=h, timeout=15)
+            print("diag ntfy", r.status_code)
+            if r.status_code == 200:
+                break
+        except Exception as e:
+            print("diag err", str(e)[:60])
+        time.sleep(3)
+
+
 if __name__ == "__main__":
     print("avvio", datetime.now(), "proxy", "on" if proxy_on else "off", len(PROXIES), "ip")
     fresh(caldo=True)
@@ -181,6 +198,14 @@ if __name__ == "__main__":
             ko = 0
         if n < 5:
             time.sleep(4)
+    pieni = sum(1 for x in diag if x >= 500)
+    vuoti = sum(1 for x in diag if x < 500)
+    riassunto = (
+        f"n={len(diag)} pieni={pieni} vuoti={vuoti} "
+        f"min={min(diag) if diag else 0} max={max(diag) if diag else 0}"
+    )
+    print(riassunto)
+    manda_diag(riassunto)
     try:
         requests.get(PING, timeout=15)
     except Exception:
