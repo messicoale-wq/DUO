@@ -1,233 +1,172 @@
-import os, json, time, random
-from datetime import datetime
-from curl_cffi import requests
+import os, json, time, random, sys
+from curl_cffi import requests as creq
 
-TARGETS = [
-    {"cap": "10095", "want": "grugliasco", "nome": "Le Gru"},
-    {"cap": "20089", "want": "rozzano", "nome": "Fiordaliso"},
-    {"cap": "10121", "want": "via roma", "nome": "Via Roma"},
-]
-PARTS = ["MK2D4QN/A", "MK2F4QN/A"]
-TOPIC = os.environ["NTFY_TOPIC"]
-PING = "https://hc-ping.com/d9ba624b-eaf3-4cea-b4d0-13d99bab793b"
+TOPIC = "duo-v-8f3k2"
+NTFY_TOKEN = "tk_drixexlcrotml35bgcnzt0q51n0c7"
+TG_TOKEN = os.environ.get("TG_TOKEN", "")
+TG_CHAT = os.environ.get("TG_CHAT", "")
+HC = "https://hc-ping.com/d9ba624b-eaf3-4cea-b4d0-13d99bab793b"
+BAG = "https://www.apple.com/it/shop/bag"
 
+WUSER = ["ibkewoalresidential-it-%d" % i for i in range(1, 11)]
 WPASS = "3e1m9fvhgohd"
-WHOST = "p.webshare.io:80"
-WUSERS = [
-    "ibkewoalresidential-it-1",
-    "ibkewoalresidential-it-2",
-    "ibkewoalresidential-it-3",
-    "ibkewoalresidential-it-4",
-    "ibkewoalresidential-it-5",
-    "ibkewoalresidential-it-6",
-    "ibkewoalresidential-it-7",
-    "ibkewoalresidential-it-8",
-    "ibkewoalresidential-it-9",
-    "ibkewoalresidential-it-10",
-]
-PROXIES = [f"http://{u}:{WPASS}@{WHOST}" for u in WUSERS]
+PHOST = "p.webshare.io:80"
+PROXIES = ["http://%s:%s@%s" % (u, WPASS, PHOST) for u in WUSER]
 
-HDRS = {
-    "Accept": "application/json, text/javascript, */*; q=0.01",
-    "Accept-Language": "it-IT,it;q=0.9,en;q=0.8",
-    "Referer": "https://www.apple.com/it/shop/buy-iphone/iphone-duo",
-    "X-Requested-With": "XMLHttpRequest",
-    "sec-ch-ua": '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
-    "sec-ch-ua-mobile": "?0",
-    "sec-ch-ua-platform": '"macOS"',
-    "Sec-Fetch-Dest": "empty",
-    "Sec-Fetch-Mode": "cors",
-    "Sec-Fetch-Site": "same-origin",
-}
+CODES = [("256", "MK2D4QN/A"), ("512", "MK2F4QN/A")]
+STORES = [("Le Gru", "10095"), ("Fiordaliso", "20089"), ("Via Roma", "10121")]
 
-SP = None
-SD = None
-N = 0
-proxy_on = bool(PROXIES)
-proxy_ko = 0
-last = {}
-diag = []
+S = creq.Session(impersonate="chrome")
 tent = 0
+ok = 0
 err = 0
+pieni = 0
+vuoti = 0
+mn = 999999
+mx = 0
+ult = "-"
+ptest = "-"
+di_fila = 0
+diretto = False
+gia = set()
 
 
-def nuova(con_proxy):
-    return requests.Session(impersonate="chrome")
-
-
-def fresh(caldo=False):
-    global SP, SD, N
-    SP = nuova(True) if proxy_on else None
-    SD = nuova(False)
-    N = 0
-    if caldo:
+def ntfy(msg, prio=3):
+    h = {"Authorization": "Bearer " + NTFY_TOKEN, "Priority": str(prio)}
+    for _ in range(3):
         try:
-            SD.get("https://www.apple.com/it/shop/buy-iphone/iphone-duo", timeout=25)
-            print("sessione nuova con cookie")
-        except Exception as e:
-            print("warm err", str(e)[:80])
+            creq.post("https://ntfy.sh/" + TOPIC, data=msg.encode(), headers=h, timeout=15)
+            return
+        except Exception:
+            time.sleep(2)
 
 
-def push(titolo, testo):
+def tg(msg):
+    if not TG_TOKEN or not TG_CHAT:
+        return
     try:
-        requests.post(
-            f"https://api.telegram.org/bot{os.environ['TG_TOKEN']}/sendMessage",
-            json={"chat_id": os.environ["TG_CHAT"], "text": titolo + " — " + testo},
-            timeout=15,
-        )
-        print("tg ok")
-    except Exception as e:
-        print("tg err", str(e)[:80])
+        creq.post("https://api.telegram.org/bot" + TG_TOKEN + "/sendMessage",
+                  data={"chat_id": TG_CHAT, "text": msg,
+                        "disable_web_page_preview": True}, timeout=15)
+    except Exception:
+        pass
+
+
+def hc(path=""):
     try:
-        requests.post(
-            f"https://ntfy.sh/{TOPIC}",
-            data=testo.encode(),
-            headers={
-                "Title": titolo,
-                "Priority": "5",
-                "Tags": "rotating_light",
-                "Click": "https://www.apple.com/it/shop/buy-iphone/iphone-duo",
-            },
-            timeout=15,
-        )
-        print("ntfy ok")
-    except Exception as e:
-        print("ntfy err", str(e)[:80])
+        creq.get(HC + path, timeout=10)
+    except Exception:
+        pass
 
 
-def prova(url, nome, sessione, modo):
-    global N, tent, err
-    if sessione is None:
-        return None
-    if N >= 10:
-        fresh()
-        sessione = SP if modo == "proxy" else SD
-        if sessione is None:
-            return None
-    kw = {}
-    if modo == "proxy":
-        if not PROXIES:
-            return None
-        tent += 1
-        p = random.choice(PROXIES)
-        kw["proxies"] = {"http": p, "https": p}
+def prova_proxy():
+    p = random.choice(PROXIES)
     try:
-        r = sessione.get(url, headers=HDRS, timeout=25, **kw)
-        N += 1
-        lung = len(r.text)
-        print(nome, modo, r.status_code, lung, "req", N)
-        if modo == "proxy":
-            diag.append(lung)
-        if r.status_code == 200:
-            try:
-                return r.json()
-            except Exception:
-                return None
-        return None
+        r = creq.get("https://api.ipify.org?format=json",
+                     proxies={"http": p, "https": p},
+                     impersonate="chrome", timeout=25)
+        return "%s %s" % (r.status_code, (r.text or "")[:45])
     except Exception as e:
-        if modo == "proxy":
-            err += 1
-        print(nome, modo, "err", str(e)[:80])
-        return None
+        return "ERR %s %s" % (type(e).__name__, str(e)[:60])
 
 
-def chiama(url, nome):
-    global proxy_ko, proxy_on
-    for tentativo in range(2):
-        u = url if tentativo == 0 else url.replace("retail/pickup-message", "fulfillment-messages")
-        if proxy_on and SP is not None:
-            r = prova(u, nome, SP, "proxy")
-            if r is not None:
-                proxy_ko = 0
-                return r
-            proxy_ko += 1
-            print("proxy ko", proxy_ko)
-            if proxy_ko >= 4:
-                proxy_on = False
-                print("proxy disattivato, si prosegue in diretta")
-            r = prova(u, nome, SD, "diretto")
-            if r is not None:
-                return r
-        else:
-            r = prova(u, nome, SD, "diretto")
-            if r is not None:
-                return r
-    return None
+def match(a, b):
+    a = a.lower()
+    b = b.lower()
+    return a in b or b in a
+
+
+def trovato(nome, size, code):
+    k = nome + size
+    if k in gia:
+        return
+    gia.add(k)
+    m = "DUO %s BIANCO %s\n%s\n%s" % (size, nome, code, BAG)
+    ntfy(m, 5)
+    tg(m)
+    print("TROVATO", m.replace("\n", " "), flush=True)
 
 
 def giro():
-    ok = 0
-    for t in TARGETS:
-        url = (
-            "https://www.apple.com/it/shop/retail/pickup-message"
-            f"?little=false&pl=true&location={t['cap']}"
-        )
-        for i, p in enumerate(PARTS):
-            url += f"&parts.{i}={p}"
-
-        data = chiama(url, t["nome"])
-        if not data:
-            continue
-        stores = data.get("body", {}).get("stores") or []
-        if not stores:
-            continue
-        ok += 1
-
-        for s in stores:
-            nome = (s.get("storeName") or "").lower()
-            if t["want"] not in nome:
-                continue
-            for p in PARTS:
-                if s.get("partsAvailability", {}).get(p, {}).get("pickupDisplay") != "available":
-                    continue
-                k = s.get("storeNumber", "") + p
-                now = time.time()
-                if now - last.get(k, 0) < 900:
-                    continue
-                last[k] = now
-                gb = "256" if p == "MK2D4QN/A" else "512"
-                push(f"DUO {gb} BIANCO", t["nome"])
-    return ok
-
-
-def manda_diag(riassunto):
-    h = {"Title": "DIAG", "Priority": "3"}
-    for _ in range(2):
+    global tent, ok, err, pieni, vuoti, mn, mx, ult, di_fila, diretto
+    for nome, cap in STORES:
+        url = ("https://www.apple.com/it/shop/retail/pickup-message"
+               "?parts.0=%s&parts.1=%s&location=%s"
+               % (CODES[0][1], CODES[1][1], cap))
+        p = None if diretto else random.choice(PROXIES)
+        tent += 1
         try:
-            r = requests.post(f"https://ntfy.sh/{TOPIC}", data=riassunto.encode(), headers=h, timeout=15)
-            print("diag ntfy", r.status_code)
-            if r.status_code == 200:
-                break
+            kw = {"timeout": 25, "impersonate": "chrome"}
+            if p:
+                kw["proxies"] = {"http": p, "https": p}
+            r = S.get(url, **kw)
+            txt = r.text or ""
+            n = len(txt)
+            if n < mn:
+                mn = n
+            if n > mx:
+                mx = n
+            if r.status_code == 200 and '"stores"' in txt:
+                pieni += 1
+                ok += 1
+                di_fila = 0
+                j = json.loads(txt)
+                stores = ((j.get("body") or {}).get("stores") or {})
+                for sv in stores.values():
+                    sn = sv.get("storeName") or ""
+                    if not match(nome, sn):
+                        continue
+                    pa = sv.get("partsAvailability") or {}
+                    for size, code in CODES:
+                        x = pa.get(code) or {}
+                        if (x.get("pickupDisplay") or "").lower() == "available":
+                            trovato(nome, size, code)
+            elif r.status_code == 200:
+                vuoti += 1
+                ult = "vuoto"
+            else:
+                vuoti += 1
+                ult = str(r.status_code)
+                if p:
+                    di_fila += 1
         except Exception as e:
-            print("diag err", str(e)[:60])
-        time.sleep(3)
+            err += 1
+            ult = "%s %s" % (type(e).__name__, str(e)[:55])
+            if p:
+                di_fila += 1
+        if p and di_fila >= 4:
+            diretto = True
+        print(nome, tent, ok, err, pieni, vuoti, ult, flush=True)
+
+
+def manda_diag():
+    m = ("DIAG tent=%d ok=%d err=%d pieni=%d vuoti=%d min=%d max=%d dir=%d pt=[%s] ult=[%s]"
+         % (tent, ok, err, pieni, vuoti, mn if mn < 999999 else 0, mx,
+            1 if diretto else 0, ptest, ult))
+    ntfy(m, 2)
+    print(m, flush=True)
+
+
+def main():
+    global ptest
+    hc("/start")
+    ptest = prova_proxy()
+    print("PTEST", ptest, flush=True)
+    for i in range(6):
+        giro()
+        if i < 5:
+            time.sleep(1.0 + random.random() * 0.8)
+    manda_diag()
+    hc()
 
 
 if __name__ == "__main__":
-    print("avvio", datetime.now(), "proxy", "on" if proxy_on else "off", len(PROXIES), "ip")
-    fresh(caldo=True)
-    ko = 0
-    for n in range(6):
-        if giro() == 0:
-            ko += 1
-            if ko >= 4:
-                print("bloccato, esco")
-                break
-        else:
-            ko = 0
-        if n < 5:
-            time.sleep(4)
-    pieni = sum(1 for x in diag if x >= 500)
-    vuoti = sum(1 for x in diag if x < 500)
-    riassunto = (
-        f"tent={tent} ok={len(diag)} err={err} "
-        f"pieni={pieni} vuoti={vuoti} "
-        f"min={min(diag) if diag else 0} max={max(diag) if diag else 0}"
-    )
-    print(riassunto)
-    manda_diag(riassunto)
     try:
-        requests.get(PING, timeout=15)
-    except Exception:
-        pass
-    print("fine")
+        main()
+    except Exception as e:
+        try:
+            hc("/fail")
+            ntfy("DUO script morto: %s %s" % (type(e).__name__, str(e)[:80]), 4)
+        except Exception:
+            pass
+        sys.exit(1)
