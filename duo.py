@@ -25,7 +25,8 @@ vuoti = 0
 mn = 999999
 mx = 0
 ult = "-"
-ptest = "-"
+pt1 = "-"
+pt2 = "-"
 di_fila = 0
 diretto = False
 gia = set()
@@ -59,15 +60,23 @@ def hc(path=""):
         pass
 
 
+def probe(url, p):
+    try:
+        r = creq.get(url, proxies={"http": p, "https": p},
+                     impersonate="chrome", timeout=25)
+        return "%s %s" % (r.status_code, (r.text or "")[:50])
+    except Exception as e:
+        return "ERR %s %s" % (type(e).__name__, str(e)[:110])
+
+
 def prova_proxy():
     p = random.choice(PROXIES)
-    try:
-        r = creq.get("https://api.ipify.org?format=json",
-                     proxies={"http": p, "https": p},
-                     impersonate="chrome", timeout=25)
-        return "%s %s" % (r.status_code, (r.text or "")[:45])
-    except Exception as e:
-        return "ERR %s %s" % (type(e).__name__, str(e)[:60])
+    print("PROXY", p.replace(WPASS, "***"), flush=True)
+    a = probe("http://api.ipify.org?format=json", p)
+    print("PT1", a, flush=True)
+    b = probe("https://api.ipify.org?format=json", p)
+    print("PT2", b, flush=True)
+    return a, b
 
 
 def match(a, b):
@@ -131,7 +140,7 @@ def giro():
                     di_fila += 1
         except Exception as e:
             err += 1
-            ult = "%s %s" % (type(e).__name__, str(e)[:55])
+            ult = "%s %s" % (type(e).__name__, str(e)[:110])
             if p:
                 di_fila += 1
         if p and di_fila >= 4:
@@ -140,18 +149,17 @@ def giro():
 
 
 def manda_diag():
-    m = ("DIAG tent=%d ok=%d err=%d pieni=%d vuoti=%d min=%d max=%d dir=%d pt=[%s] ult=[%s]"
+    m = ("DIAG tent=%d ok=%d err=%d pieni=%d vuoti=%d min=%d max=%d dir=%d pt1=[%s] pt2=[%s] ult=[%s]"
          % (tent, ok, err, pieni, vuoti, mn if mn < 999999 else 0, mx,
-            1 if diretto else 0, ptest, ult))
+            1 if diretto else 0, pt1, pt2, ult))
     ntfy(m, 2)
     print(m, flush=True)
 
 
 def main():
-    global ptest
+    global pt1, pt2
     hc("/start")
-    ptest = prova_proxy()
-    print("PTEST", ptest, flush=True)
+    pt1, pt2 = prova_proxy()
     for i in range(6):
         giro()
         if i < 5:
