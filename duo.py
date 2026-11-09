@@ -139,4 +139,72 @@ def giro():
         if n:
             if n < mn:
                 mn = n
-            if n
+            if n > mx:
+                mx = n
+        if corpo == "-" and txt:
+            corpo = txt[:170].replace("\n", " ")
+        if st == 200 and '"stores"' in txt:
+            ok += 1
+            pieni += 1
+            di_fila = 0
+            j = json.loads(txt)
+            stores = (j.get("body") or {}).get("stores") or []
+            if isinstance(stores, dict):
+                stores = list(stores.values())
+            for sv in stores:
+                sn = sv.get("storeName") or ""
+                if not match(nome, sn):
+                    continue
+                pa = sv.get("partsAvailability") or {}
+                for size, code in CODES:
+                    x = pa.get(code) or {}
+                    if (x.get("pickupDisplay") or "").lower() == "available":
+                        trovato(nome, size, code)
+        elif st == 0:
+            err += 1
+            ult = em or "errore"
+            di_fila += 1
+        elif st != 200:
+            vuoti += 1
+            ult = str(st)
+            di_fila += 1
+        else:
+            vuoti += 1
+            ult = "vuoto"
+            di_fila += 1
+        if di_fila >= 6:
+            diretto = True
+        print(nome, tent, ok, err, pieni, vuoti, ult, flush=True)
+
+
+def manda_diag():
+    m = ("DIAG tent=%d ok=%d err=%d pieni=%d vuoti=%d min=%d max=%d dir=%d pt1=[%s] pt2=[%s] ult=[%s] corpo=[%s]"
+         % (tent, ok, err, pieni, vuoti, mn if mn < 999999 else 0, mx,
+            1 if diretto else 0, pt1, pt2, ult, corpo))
+    print(m, flush=True)
+    if ok == 0:
+        ntfy("DUO cieco: " + m, 4)
+
+
+def main():
+    global pt1, pt2
+    hc("/start")
+    pt1, pt2 = prova_proxy()
+    for i in range(4):
+        giro()
+        if i < 3:
+            time.sleep(1.0 + random.random() * 0.8)
+    manda_diag()
+    hc()
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception as e:
+        try:
+            hc("/fail")
+            ntfy("DUO script morto: %s %s" % (type(e).__name__, str(e)[:80]), 4)
+        except Exception:
+            pass
+        sys.exit(1)
