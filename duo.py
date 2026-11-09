@@ -13,7 +13,7 @@ WPASS = "DuoProxy2026"
 PHOST = "p.webshare.io:80"
 PROXIES = ["http://%s:%s@%s" % (u, WPASS, PHOST) for u in WUSER]
 
-CODES = [("256", "MK2D4QN/A"), ("512", "MK2F4QN/A")]
+CODES = [("256", "MK2D4QL/A"), ("512", "MK2F4QL/A")]
 STORES = [("Le Gru", "10095"), ("Fiordaliso", "20089"), ("Via Roma", "10121")]
 
 S = creq.Session(impersonate="chrome")
@@ -101,7 +101,7 @@ def giro():
     global tent, ok, err, pieni, vuoti, mn, mx, ult, corpo, di_fila, diretto
     for nome, cap in STORES:
         url = ("https://www.apple.com/it/shop/retail/pickup-message"
-               "?parts.0=%s&parts.1=%s&location=%s"
+               "?parts.0=%s&parts.1=%s&location=%s&little=false&mt=regular"
                % (CODES[0][1], CODES[1][1], cap))
         p = None if diretto else random.choice(PROXIES)
         tent += 1
@@ -123,8 +123,10 @@ def giro():
                 ok += 1
                 di_fila = 0
                 j = json.loads(txt)
-                stores = ((j.get("body") or {}).get("stores") or {})
-                for sv in stores.values():
+                stores = (j.get("body") or {}).get("stores") or []
+                if isinstance(stores, dict):
+                    stores = list(stores.values())
+                for sv in stores:
                     sn = sv.get("storeName") or ""
                     if not match(nome, sn):
                         continue
