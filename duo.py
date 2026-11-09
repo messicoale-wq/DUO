@@ -1,4 +1,4 @@
-import os, json, time
+import os, json, time, random
 from datetime import datetime
 from curl_cffi import requests
 
@@ -10,6 +10,11 @@ TARGETS = [
 PARTS = ["MK2D4QN/A", "MK2F4QN/A"]
 TOPIC = os.environ["NTFY_TOPIC"]
 PING = "https://hc-ping.com/d9ba624b-eaf3-4cea-b4d0-13d99bab793b"
+
+WUSERS = [u.strip() for u in os.environ.get("WEBSHARE_USER", "").split(",") if u.strip()]
+WPASS = os.environ.get("WEBSHARE_PASS", "").strip()
+WHOST = os.environ.get("WEBSHARE_HOST", "p.webshare.io:80").strip()
+PROXIES = [f"http://{u}:{WPASS}@{WHOST}" for u in WUSERS] if WUSERS and WPASS else []
 
 HDRS = {
     "Accept": "application/json, text/javascript, */*; q=0.01",
@@ -24,21 +29,29 @@ HDRS = {
     "Sec-Fetch-Site": "same-origin",
 }
 
-S = None
+SP = None
+SD = None
 N = 0
+proxy_on = bool(PROXIES)
+proxy_ko = 0
 last = {}
 
 
+def nuova(con_proxy):
+    return requests.Session(impersonate="chrome")
+
+
 def fresh(caldo=False):
-    global S, N
-    S = requests.Session(impersonate="chrome")
+    global SP, SD, N
+    SP = nuova(True) if proxy_on else None
+    SD = nuova(False)
     N = 0
     if caldo:
         try:
-            S.get("https://www.apple.com/it/shop/buy-iphone/iphone-duo", timeout=25)
+            SD.get("https://www.apple.com/it/shop/buy-iphone/iphone-duo", timeout=25)
             print("sessione nuova con cookie")
         except Exception as e:
-            print("warm err", e)
+            print("warm err", str(e)[:80])
 
 
 def push(titolo, testo):
@@ -50,7 +63,7 @@ def push(titolo, testo):
         )
         print("tg ok")
     except Exception as e:
-        print("tg err", e)
+        print("tg err", str(e)[:80])
     try:
         requests.post(
             f"https://ntfy.sh/{TOPIC}",
@@ -65,29 +78,60 @@ def push(titolo, testo):
         )
         print("ntfy ok")
     except Exception as e:
-        print("ntfy err", e)
+        print("ntfy err", str(e)[:80])
+
+
+def prova(url, nome, sessione, modo):
+    global N
+    if sessione is None:
+        return None
+    if N >= 10:
+        fresh()
+        sessione = SP if modo == "proxy" else SD
+        if sessione is None:
+            return None
+    kw = {}
+    if modo == "proxy":
+        if not PROXIES:
+            return None
+        p = random.choice(PROXIES)
+        kw["proxies"] = {"http": p, "https": p}
+    try:
+        r = sessione.get(url, headers=HDRS, timeout=25, **kw)
+        N += 1
+        print(nome, modo, r.status_code, "req", N)
+        if r.status_code == 200:
+            try:
+                return r.json()
+            except Exception:
+                return None
+        return None
+    except Exception as e:
+        print(nome, modo, "err", str(e)[:80])
+        return None
 
 
 def chiama(url, nome):
-    global N
+    global proxy_ko, proxy_on
     for tentativo in range(2):
-        if N >= 10:
-            fresh()
         u = url if tentativo == 0 else url.replace("retail/pickup-message", "fulfillment-messages")
-        try:
-            r = S.get(u, headers=HDRS, timeout=20)
-            N += 1
-            print(nome, r.status_code, "req", N)
-            if r.status_code == 200:
-                try:
-                    return r.json()
-                except Exception:
-                    pass
-            else:
-                fresh()
-        except Exception as e:
-            print(nome, "err", e)
-            fresh()
+        if proxy_on and SP is not None:
+            r = prova(u, nome, SP, "proxy")
+            if r is not None:
+                proxy_ko = 0
+                return r
+            proxy_ko += 1
+            print("proxy ko", proxy_ko)
+            if proxy_ko >= 4:
+                proxy_on = False
+                print("proxy disattivato, si prosegue in diretta")
+            r = prova(u, nome, SD, "diretto")
+            if r is not None:
+                return r
+        else:
+            r = prova(u, nome, SD, "diretto")
+            if r is not None:
+                return r
     return None
 
 
@@ -124,7 +168,7 @@ def giro():
 
 
 if __name__ == "__main__":
-    print("avvio", datetime.now())
+    print("avvio", datetime.now(), "proxy", "on" if proxy_on else "off", len(PROXIES), "ip")
     fresh(caldo=True)
     ko = 0
     for n in range(6):
@@ -136,7 +180,7 @@ if __name__ == "__main__":
         else:
             ko = 0
         if n < 5:
-            time.sleep(8)
+            time.sleep(4)
     try:
         requests.get(PING, timeout=15)
     except Exception:
