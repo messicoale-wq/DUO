@@ -1,3 +1,4 @@
+# force reindex dispatch registry
 name: duo
 on:
   schedule:
